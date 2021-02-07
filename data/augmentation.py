@@ -1,8 +1,6 @@
 import random
 import torchvision.transforms as transforms
-import cv2
 from PIL import ImageFilter, Image, ImageOps
-import numpy as np
 
 
 class GaussianBlur(object):

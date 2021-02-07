@@ -7,9 +7,6 @@ import mc
 import io
 import random
 import torch
-import ctypes
-import multiprocessing as mp
-import numpy as np
 
 
 class DatasetCache(data.Dataset):
@@ -98,20 +95,6 @@ class ImagenetContrastive(BaseDataset):
 
 
 
-class ImagenetContrastiveWithLabel(BaseDataset):
-    def __init__(self, mode='train', max_class=1000, aug=None):
-        super().__init__(mode, max_class, aug)
-
-    def __len__(self):
-        return self.samples.__len__()
-
-    def __getitem__(self, index):
-        label, name = self.samples[index]
-        filename = os.path.join(self.image_folder, name)
-        img = self.load_image(filename)
-        return self.transform(img), self.transform(img), label
-
-
 class Imagenet(BaseDataset):
     def __init__(self, mode='train', max_class=1000, aug=None):
         super().__init__(mode, max_class, aug)
@@ -125,112 +108,4 @@ class Imagenet(BaseDataset):
         img = self.load_image(filename)
         return self.transform(img), label
 
-
-class ImagenetPercent(DatasetCache):
-    def __init__(self, percent, aug=None):
-        super().__init__()
-        classes = [d.name for d in os.scandir('/mnt/lustre/share/images/train') if d.is_dir()]
-        classes.sort()
-        class_to_idx = {classes[i]: i for i in range(len(classes))}
-
-        if percent == 1:
-            image_list = 'semi_files/1percent.txt'
-        elif percent == 10:
-            image_list = 'semi_files/10percent.txt'
-        else:
-            raise NotImplementedError('you have to choose from 1 percent or 10 percent')
-
-        self.samples = []
-        with open(image_list) as f:
-            for line in f:
-                name = line.strip()
-                class_name = name.split('_')[0]
-                label = class_to_idx[class_name]
-                name = class_name + '/' + name
-                self.samples.append((label, name))
-
-        if aug is None:
-            self.transform = transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225])
-            ])
-        else:
-            self.transform = aug
-
-    def __len__(self):
-        return self.samples.__len__()
-
-    def __getitem__(self, index):
-        label, name = self.samples[index]
-        filename = os.path.join('/mnt/lustre/share/images/train/', name)
-        img = self.load_image(filename)
-        return self.transform(img), label
-
-
-
-
-class ImagenetContrastiveWithIndex(BaseDataset):
-    def __init__(self, mode='train', max_class=1000, aug=None, topk=1):
-        super().__init__(mode, max_class, aug)
-
-        num_images = self.samples.__len__()
-        shared_array_base = mp.Array(ctypes.c_long, num_images * topk)
-        shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
-        shared_array = shared_array.reshape(num_images, topk)
-        self.knn = shared_array
-
-    def update_knn(self, indices, similar_indices):
-        self.knn[indices] = similar_indices
-
-    def __len__(self):
-        return self.samples.__len__()
-
-    def __getitem__(self, index):
-        _, name = self.samples[index]
-        filename = os.path.join(self.image_folder, name)
-        img = self.load_image(filename)
-
-        similar = []
-        if not self.knn is None:
-            for i in self.knn[index]:
-                _, name = self.samples[i]
-                filename = os.path.join(self.image_folder, name)
-                similar_img = self.load_image(filename)
-                similar.append(self.transform(similar_img))
-            similar = torch.stack(similar)
-        return self.transform(img), self.transform(img), index, similar
-
-
-
-
-
-
-class ImagenetSupContrast(BaseDataset):
-    def __init__(self, mode='train', max_class=1000, aug=None):
-        super().__init__(mode, max_class, aug)
-
-        class_dict = {}
-        for (label, name) in self.samples:
-            if label in class_dict:
-                class_dict[label].append(name)
-            else:
-                class_dict[label] = [name]
-        self.class_dict = class_dict
-
-    def __len__(self):
-        return self.samples.__len__()
-
-    def __getitem__(self, index):
-        label, name = self.samples[index]
-        filename = os.path.join(self.image_folder, name)
-        img = self.load_image(filename)
-        
-        pos_name = random.choice(self.class_dict[label])
-        pos_filename = os.path.join(self.image_folder, pos_name)
-        pos_img = self.load_image(pos_filename)
-        
-        return self.transform(img), self.transform(pos_img), label
 
