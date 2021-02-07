@@ -12,4 +12,4 @@ Results on Imagenet:
 |          |Arch | BatchSize | Epochs | Accuracy (our reproduce)|  Accuracy (paper) |
 |----------|:----:|:---:|:---:|:---:|:---:|
 |  BYOL | ResNet50 | 4096 | 100  |  68.8 % | - |
-|  BYOL | ResNet50 | 4096 | 200  |  72.7 % | 72.5% |
+|  BYOL | ResNet50 | 4096 | 200  |  72.8 % | 72.5% |
