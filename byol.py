@@ -129,6 +129,8 @@ def main():
         train_sampler.set_epoch(epoch)
         train(train_loader, model, local_rank, rank, optimizer, epoch, lr)
         if rank == 0 and (epoch+1) % 50 == 0:
+            if not os.path.exists('checkpoints'):
+                os.makedirs('checkpoints')
             torch.save({
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
